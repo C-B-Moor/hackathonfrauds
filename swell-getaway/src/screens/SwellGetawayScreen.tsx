@@ -1,46 +1,41 @@
 import React, {
-  useEffect,
+  useState,
   useMemo,
   useRef,
-  useState,
+  useEffect,
 } from 'react';
 import {
-  Alert,
-  Animated,
-  KeyboardAvoidingView,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
   Modal,
+  TextInput,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+  Animated,
 } from 'react-native';
+import BeachScene from '../ui/BeachScene';
+import CrabCoach from '../ui/CrabCoach';
 import {
   DailyMission,
-  Focus,
+  getTodayId,
   generateDailyPrompt,
   getDailyMissions,
   getLevelMeta,
-  getTodayId,
   getUnlocks,
 } from '../state/getawayLogic';
-import BeachScene from '../ui/BeachScene';
-import CrabCoach from '../ui/CrabCoach';
 
 type Entry = {
   id: string;
   date: string;
-  focus: Focus;
   missionId: string;
   xp: number;
   shells: number;
   reflection?: string;
 };
-
-const focusOptions: Focus[] = ['relationships', 'stress', 'performance'];
 
 const milestoneConfig = [
   { xp: 50, label: 'Towel and shade' },
@@ -51,41 +46,60 @@ const milestoneConfig = [
 ];
 
 const SwellGetawayScreen: React.FC = () => {
-  const [focus, setFocus] = useState<Focus>('relationships');
-  const [totalXp, setTotalXp] = useState<number>(60); // demo seed
-  const [totalShells, setTotalShells] = useState<number>(6); // demo seed
+  const [totalXp, setTotalXp] = useState<number>(60);
+  const [totalShells, setTotalShells] = useState<number>(6);
   const [entries, setEntries] = useState<Entry[]>([]);
 
-  const [reflectionMission, setReflectionMission] = useState<DailyMission | null>(null);
-  const [reflectionText, setReflectionText] = useState<string>('');
-  const [showReflection, setShowReflection] = useState<boolean>(false);
+  const [reflectionMission, setReflectionMission] =
+    useState<DailyMission | null>(null);
+  const [reflectionText, setReflectionText] =
+    useState<string>('');
+  const [showReflection, setShowReflection] =
+    useState<boolean>(false);
 
-  const [showBeachZoom, setShowBeachZoom] = useState<boolean>(false);
+  const [showBeachZoom, setShowBeachZoom] =
+    useState<boolean>(false);
+  const [showCoach, setShowCoach] =
+    useState<boolean>(false);
 
-  const [justLeveled, setJustLeveled] = useState<boolean>(false);
-  const levelBannerOpacity = useRef(new Animated.Value(0)).current;
+  const [justLeveled, setJustLeveled] =
+    useState<boolean>(false);
+  const levelBannerOpacity = useRef(
+    new Animated.Value(0)
+  ).current;
   const lastLevelRef = useRef<number>(0);
 
   const todayId = getTodayId();
 
+  // Mixed missions: 1 relationship, 1 stress, 1 performance
   const missions = useMemo(
-    () => getDailyMissions(focus, todayId),
-    [focus, todayId]
+    () =>
+      getDailyMissions(
+        'relationships',
+        todayId
+      ), // focus param ignored in logic
+    [todayId]
   );
 
   const completedMissionIds = useMemo(
     () =>
       new Set(
         entries
-          .filter((e) => e.date === todayId && !!e.missionId)
+          .filter(
+            (e) => e.date === todayId
+          )
           .map((e) => e.missionId)
       ),
     [entries, todayId]
   );
 
   const todayPrompt = useMemo(
-    () => generateDailyPrompt(focus, todayId),
-    [focus, todayId]
+    () =>
+      generateDailyPrompt(
+        'relationships',
+        todayId
+      ), // unified prompt
+    [todayId]
   );
 
   const levelMeta = useMemo(
@@ -94,7 +108,8 @@ const SwellGetawayScreen: React.FC = () => {
   );
 
   const unlocks = useMemo(
-    () => getUnlocks(totalXp, totalShells),
+    () =>
+      getUnlocks(totalXp, totalShells),
     [totalXp, totalShells]
   );
 
@@ -103,7 +118,7 @@ const SwellGetawayScreen: React.FC = () => {
     [entries]
   );
 
-  // Level-up banner
+  // Level up banner
   useEffect(() => {
     if (levelMeta.level > lastLevelRef.current) {
       lastLevelRef.current = levelMeta.level;
@@ -120,16 +135,21 @@ const SwellGetawayScreen: React.FC = () => {
             toValue: 0,
             duration: 200,
             useNativeDriver: true,
-          }).start(() => setJustLeveled(false));
+          }).start(() =>
+            setJustLeveled(false)
+          );
         }, 1400);
       });
     }
   }, [levelMeta.level, levelBannerOpacity]);
 
-  // Mission handling
+  // Missions
 
-  const startMission = (mission: DailyMission) => {
-    if (completedMissionIds.has(mission.id)) return;
+  const startMission = (
+    mission: DailyMission
+  ) => {
+    if (completedMissionIds.has(mission.id))
+      return;
 
     if (mission.requiresReflection) {
       setReflectionMission(mission);
@@ -141,13 +161,16 @@ const SwellGetawayScreen: React.FC = () => {
     applyMissionReward(mission, '');
   };
 
-  const applyMissionReward = (mission: DailyMission, note: string) => {
-    if (completedMissionIds.has(mission.id)) return;
+  const applyMissionReward = (
+    mission: DailyMission,
+    note: string
+  ) => {
+    if (completedMissionIds.has(mission.id))
+      return;
 
     const entry: Entry = {
       id: `${todayId}-${mission.id}`,
       date: todayId,
-      focus,
       missionId: mission.id,
       xp: mission.xp,
       shells: mission.rewardShells,
@@ -155,13 +178,21 @@ const SwellGetawayScreen: React.FC = () => {
     };
 
     setEntries((prev) => [entry, ...prev]);
-    setTotalXp((prev) => prev + mission.xp);
-    setTotalShells((prev) => prev + mission.rewardShells);
+    setTotalXp(
+      (prev) => prev + mission.xp
+    );
+    setTotalShells(
+      (prev) =>
+        prev + mission.rewardShells
+    );
   };
 
   const confirmReflection = () => {
     if (!reflectionMission) return;
-    applyMissionReward(reflectionMission, reflectionText.trim());
+    applyMissionReward(
+      reflectionMission,
+      reflectionText.trim()
+    );
     setShowReflection(false);
     setReflectionMission(null);
     setReflectionText('');
@@ -173,184 +204,245 @@ const SwellGetawayScreen: React.FC = () => {
     setReflectionText('');
   };
 
-  const renderMission = (mission: DailyMission) => {
-    const done = completedMissionIds.has(mission.id);
+  const renderMission = (
+    mission: DailyMission
+  ) => {
+    const done =
+      completedMissionIds.has(mission.id);
     const tierLabel =
       mission.tier === 'easy'
         ? 'Low friction'
         : mission.tier === 'core'
-        ? 'Core rep'
+        ? 'Core'
         : 'Stretch';
 
     return (
       <TouchableOpacity
         key={mission.id}
-        style={[styles.missionCard, done && styles.missionDone]}
+        style={[
+          styles.missionCard,
+          done && styles.missionDone,
+        ]}
         onPress={() => startMission(mission)}
         activeOpacity={0.9}
       >
         <View style={styles.missionLeft}>
-          <Text style={styles.missionTier}>{tierLabel}</Text>
-          <Text style={styles.missionLabel} numberOfLines={2}>
+          <Text style={styles.missionTier}>
+            {tierLabel}
+          </Text>
+          <Text
+            style={styles.missionLabel}
+            numberOfLines={2}
+          >
             {mission.label}
           </Text>
           <Text style={styles.missionXp}>
-            +{mission.xp} XP • +{mission.rewardShells}🐚
+            +{mission.xp} XP · +
+            {mission.rewardShells} shells
           </Text>
         </View>
-        <View style={styles.missionStatusBubble}>
-          <Text style={styles.missionStatusText}>
-            {done ? '✓ Done' : 'Tap to claim'}
+        <View
+          style={
+            styles.missionStatusBubble
+          }
+        >
+          <Text
+            style={
+              styles.missionStatusText
+            }
+          >
+            {done
+              ? 'Completed'
+              : 'Tap to claim'}
           </Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  const missionsCompletedCount = missions.filter((m) =>
-    completedMissionIds.has(m.id)
-  ).length;
+  const missionsCompletedCount =
+    missions.filter((m) =>
+      completedMissionIds.has(m.id)
+    ).length;
 
-  const handleMilestonePress = (xp: number, label: string) => {
-    if (totalXp >= xp) {
-      Alert.alert('Unlocked', `${label} is already part of your beach experience.`);
-    } else {
-      const remaining = xp - totalXp;
-      Alert.alert(
-        'Not yet',
-        `Earn ${remaining} more XP to unlock ${label}.`
-      );
-    }
+  const handleMilestonePress = (
+    xp: number,
+    label: string
+  ) => {
+    if (totalXp >= xp) return;
+    const remaining = xp - totalXp;
+    alert(
+      `You are ${remaining} XP away from ${label}.`
+    );
   };
+
+  // UI
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Swell Getaway</Text>
+        <Text style={styles.title}>
+          Swell Getaway
+        </Text>
         <View style={styles.levelTag}>
           <Text style={styles.levelTagText}>
-            Lv {levelMeta.level}  ·  {totalXp} XP
+            Lv {levelMeta.level} · {totalXp} XP
           </Text>
         </View>
       </View>
 
       <View style={styles.headerMetricsRow}>
         <Text style={styles.headerMetric}>
-          {missionsCompletedCount}/{missions.length} today
+          {missionsCompletedCount}/
+          {missions.length} today
         </Text>
         <Text style={styles.headerMetric}>
-          {streak > 0 ? `${streak}-day streak` : 'Streak ready'}
+          {streak > 0
+            ? `${streak}-day streak`
+            : 'Streak ready'}
         </Text>
       </View>
 
       <Text style={styles.subtitle}>
-        One small rep at a time. Your space here grows with you.
+        One calm place for small reps that
+        touch your work, stress, and
+        relationships.
       </Text>
 
       {justLeveled && (
         <Animated.View
-          style={[styles.levelUpBanner, { opacity: levelBannerOpacity }]}
+          style={[
+            styles.levelUpBanner,
+            { opacity: levelBannerOpacity },
+          ]}
         >
           <Text style={styles.levelUpText}>
-            New level reached: {levelMeta.label}
+            New level reached:{' '}
+            {levelMeta.label}
           </Text>
         </Animated.View>
       )}
 
-      {/* Scrollable content */}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingBottom: 40,
+        }}
       >
-        {/* Focus selector */}
-        <View style={styles.focusRow}>
-          {focusOptions.map((f) => (
-            <TouchableOpacity
-              key={f}
-              style={[
-                styles.focusChip,
-                focus === f && styles.focusChipActive,
-              ]}
-              onPress={() => setFocus(f)}
-            >
-              <Text
-                style={[
-                  styles.focusChipText,
-                  focus === f && styles.focusChipTextActive,
-                ]}
-              >
-                {labelForFocus(f)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Beach as home. Long press to zoom, crab opens coach. */}
+        <Pressable
+          onLongPress={() =>
+            setShowBeachZoom(true)
+          }
+        >
+          <BeachScene
+            unlocks={unlocks}
+            levelLabel={levelMeta.label}
+            totalShells={totalShells}
+            compact
+            onOpenCrab={() =>
+              setShowCoach(true)
+            }
+          />
+        </Pressable>
 
-        {/* Beach + progress */}
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={{ flex: 3 }}
-            activeOpacity={0.9}
-            onPress={() => setShowBeachZoom(true)}
+        {/* Progress */}
+        <View
+          style={styles.progressColumn}
+        >
+          <View
+            style={
+              styles.progressBarBg
+            }
           >
-            <BeachScene
-              unlocks={unlocks}
-              levelLabel={levelMeta.label}
-              totalShells={totalShells}
-              compact
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${
+                    levelMeta.progress *
+                    100
+                  }%`,
+                },
+              ]}
             />
-          </TouchableOpacity>
-          <View style={styles.progressColumn}>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${levelMeta.progress * 100}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.progressText}>
-              {Math.round(levelMeta.progress * 100)}% to next level
-            </Text>
-            <Text style={styles.streakText}>
-              {streak > 0 ? `${streak}-day streak` : 'Begin with one honest rep'}
-            </Text>
           </View>
+          <Text
+            style={styles.progressText}
+          >
+            {Math.round(
+              levelMeta.progress *
+                100
+            )}
+            % to next level
+          </Text>
+          <Text
+            style={styles.streakText}
+          >
+            {streak > 0
+              ? `${streak}-day streak`
+              : 'One honest rep starts it'}
+          </Text>
         </View>
 
-        {/* Crab coach */}
+        {/* Riff / AI hook */}
         <CrabCoach
           totalXp={totalXp}
           streak={streak}
-          focus={focus}
           totalShells={totalShells}
+          onOpenCrab={() =>
+            setShowCoach(true)
+          }
         />
 
         {/* Today prompt */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Today’s tiny rep</Text>
-          <Text style={styles.cardPrompt}>{todayPrompt.text}</Text>
+          <Text
+            style={styles.cardLabel}
+          >
+            Today’s tiny rep
+          </Text>
+          <Text
+            style={styles.cardPrompt}
+          >
+            {todayPrompt.text}
+          </Text>
         </View>
 
         {/* Next unlocks */}
-        <Text style={styles.sectionLabel}>Next unlocks</Text>
-        <View style={styles.milestoneRow}>
+        <Text
+          style={styles.sectionLabel}
+        >
+          Next unlocks
+        </Text>
+        <View
+          style={styles.milestoneRow}
+        >
           {milestoneConfig.map((m) => {
-            const done = totalXp >= m.xp;
+            const done =
+              totalXp >= m.xp;
             return (
               <TouchableOpacity
                 key={m.xp}
                 style={[
                   styles.milestonePill,
-                  done && styles.milestonePillDone,
+                  done &&
+                    styles.milestonePillDone,
                 ]}
-                onPress={() => handleMilestonePress(m.xp, m.label)}
                 activeOpacity={0.9}
+                onPress={() =>
+                  handleMilestonePress(
+                    m.xp,
+                    m.label
+                  )
+                }
               >
                 <Text
                   style={[
                     styles.milestoneLabel,
-                    done && styles.milestoneLabelDone,
+                    done &&
+                      styles.milestoneLabelDone,
                   ]}
                 >
                   {m.xp} XP
@@ -358,7 +450,8 @@ const SwellGetawayScreen: React.FC = () => {
                 <Text
                   style={[
                     styles.milestoneText,
-                    done && styles.milestoneLabelDone,
+                    done &&
+                      styles.milestoneLabelDone,
                   ]}
                 >
                   {m.label}
@@ -369,49 +462,179 @@ const SwellGetawayScreen: React.FC = () => {
         </View>
 
         {/* Missions */}
-        <Text style={styles.sectionLabel}>Today’s missions</Text>
-        <View style={styles.missionsWrap}>
-          {missions.map(renderMission)}
+        <Text
+          style={styles.sectionLabel}
+        >
+          Today’s missions
+        </Text>
+        <View
+          style={styles.missionsWrap}
+        >
+          {missions.map(
+            renderMission
+          )}
         </View>
 
-        {/* Recent progress */}
-        <Text style={styles.sectionLabel}>Recent progress</Text>
+        {/* History */}
+        <Text
+          style={styles.sectionLabel}
+        >
+          Recent progress
+        </Text>
         {entries.length === 0 ? (
-          <Text style={styles.historyEmpty}>
-            Your next real moment will land here.
+          <Text
+            style={styles.historyEmpty}
+          >
+            Your next real moment will
+            land here.
           </Text>
         ) : (
           entries.map((item) => (
-            <Text key={item.id} style={styles.historyItem}>
-              {item.date} · {labelForFocus(item.focus)} · +{item.xp} XP · +
-              {item.shells}🐚
-              {item.reflection ? `  “${item.reflection}”` : ''}
+            <Text
+              key={item.id}
+              style={
+                styles.historyItem
+              }
+            >
+              {item.date} · +
+              {item.xp} XP · +
+              {item.shells} shells
+              {item.reflection
+                ? `  "${item.reflection}"`
+                : ''}
             </Text>
           ))
         )}
       </ScrollView>
 
-      {/* Beach zoom modal */}
+      {/* Beach zoom */}
       <Modal
         visible={showBeachZoom}
         transparent
         animationType="fade"
       >
         <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setShowBeachZoom(false)}
+          style={
+            styles.modalBackdrop
+          }
+          onPress={() =>
+            setShowBeachZoom(false)
+          }
         />
-        <View style={styles.beachZoomCard}>
+        <View
+          style={
+            styles.beachZoomCard
+          }
+        >
           <BeachScene
             unlocks={unlocks}
             levelLabel={levelMeta.label}
             totalShells={totalShells}
             compact={false}
           />
-          <Text style={styles.beachZoomText}>
-            This is your current shoreline. Every unlocked detail comes from real effort.
+          <Text
+            style={
+              styles.beachZoomText
+            }
+          >
+            This shoreline reflects the
+            small choices you keep
+            making.
           </Text>
         </View>
+      </Modal>
+
+      {/* Swell AI coach hook */}
+      <Modal
+        visible={showCoach}
+        transparent
+        animationType="fade"
+      >
+        <KeyboardAvoidingView
+          style={
+            styles.modalOverlay
+          }
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : undefined
+          }
+        >
+          <Pressable
+            style={
+              styles.modalBackdrop
+            }
+            onPress={() =>
+              setShowCoach(false)
+            }
+          />
+          <View
+            style={styles.modalCard}
+          >
+            <Text
+              style={styles.modalTitle}
+            >
+              Swell coach space
+            </Text>
+            <Text
+              style={
+                styles.modalSubtitle
+              }
+            >
+              In the full product this
+              button would open the
+              main Swell AI therapist
+              with context from
+              today’s missions and
+              reflections, so your
+              coach sees what you are
+              practicing.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Describe a situation or question you would send to Swell."
+              placeholderTextColor="#9BA8B3"
+              multiline
+            />
+            <View
+              style={
+                styles.modalButtonsRow
+              }
+            >
+              <TouchableOpacity
+                style={
+                  styles.modalSecondary
+                }
+                onPress={() =>
+                  setShowCoach(
+                    false
+                  )
+                }
+              >
+                <Text
+                  style={
+                    styles.modalSecondaryText
+                  }
+                >
+                  Close
+                </Text>
+              </TouchableOpacity>
+              <View
+                style={
+                  styles.modalPrimary
+                }
+              >
+                <Text
+                  style={
+                    styles.modalPrimaryText
+                  }
+                >
+                  Send to Swell AI
+                </Text>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Reflection modal */}
@@ -421,38 +644,84 @@ const SwellGetawayScreen: React.FC = () => {
         animationType="fade"
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={
+            styles.modalOverlay
+          }
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : undefined
+          }
         >
           <Pressable
-            style={styles.modalBackdrop}
+            style={
+              styles.modalBackdrop
+            }
             onPress={cancelReflection}
           />
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Log your rep</Text>
-            <Text style={styles.modalSubtitle}>
-              One clear sentence about what you tried or how it went.
+          <View
+            style={styles.modalCard}
+          >
+            <Text
+              style={styles.modalTitle}
+            >
+              Log your rep
+            </Text>
+            <Text
+              style={
+                styles.modalSubtitle
+              }
+            >
+              One clear line about
+              what you tried or how it
+              went.
             </Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="For example: Stayed calm when briefing my team after a long shift."
+              placeholder="For example: Took a breath before answering instead of snapping."
               placeholderTextColor="#9BA8B3"
               value={reflectionText}
-              onChangeText={setReflectionText}
+              onChangeText={
+                setReflectionText
+              }
               multiline
             />
-            <View style={styles.modalButtonsRow}>
+            <View
+              style={
+                styles.modalButtonsRow
+              }
+            >
               <TouchableOpacity
-                style={styles.modalSecondary}
-                onPress={cancelReflection}
+                style={
+                  styles.modalSecondary
+                }
+                onPress={
+                  cancelReflection
+                }
               >
-                <Text style={styles.modalSecondaryText}>Cancel</Text>
+                <Text
+                  style={
+                    styles.modalSecondaryText
+                  }
+                >
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalPrimary}
-                onPress={confirmReflection}
+                style={
+                  styles.modalPrimary
+                }
+                onPress={
+                  confirmReflection
+                }
               >
-                <Text style={styles.modalPrimaryText}>Save and claim</Text>
+                <Text
+                  style={
+                    styles.modalPrimaryText
+                  }
+                >
+                  Save and claim
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -464,27 +733,22 @@ const SwellGetawayScreen: React.FC = () => {
 
 // Helpers
 
-function computeStreak(entries: Entry[]): number {
+function computeStreak(
+  entries: Entry[]
+): number {
   if (!entries.length) return 0;
-
-  const dates = Array.from(new Set(entries.map((e) => e.date))).sort();
+  const dates = Array.from(
+    new Set(entries.map((e) => e.date))
+  ).sort();
   let streak = 0;
   let cursor = getTodayId();
-
   while (dates.includes(cursor)) {
     streak++;
     const d = new Date(cursor);
     d.setDate(d.getDate() - 1);
     cursor = d.toISOString().slice(0, 10);
   }
-
   return streak;
-}
-
-function labelForFocus(f: Focus): string {
-  if (f === 'relationships') return 'Relationships';
-  if (f === 'stress') return 'Stress';
-  return 'Performance';
 }
 
 // Styles
@@ -538,49 +802,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#123B5D',
     marginBottom: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-    elevation: 3,
   },
   levelUpText: {
     fontSize: 11,
     color: '#F5F2EC',
     fontWeight: '500',
   },
-  focusRow: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  focusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#D2D8DE',
-    marginRight: 6,
-  },
-  focusChipActive: {
-    backgroundColor: '#123B5D',
-    borderColor: '#123B5D',
-  },
-  focusChipText: {
-    fontSize: 11,
-    color: '#5B6E83',
-  },
-  focusChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    marginBottom: 4,
-  },
   progressColumn: {
-    flex: 2,
-    paddingLeft: 8,
-    justifyContent: 'center',
+    marginBottom: 6,
   },
   progressBarBg: {
     width: '100%',
@@ -718,7 +947,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#B0B8C2',
   },
-  // Modals
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -801,3 +1029,4 @@ const styles = StyleSheet.create({
 });
 
 export default SwellGetawayScreen;
+
