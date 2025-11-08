@@ -1,69 +1,87 @@
 import React, {
-  useState,
+  useEffect,
   useMemo,
   useRef,
-  useEffect,
+  useState,
 } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Modal,
-  TextInput,
+  Animated,
+  ImageBackground,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
-  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import BeachScene from '../ui/BeachScene';
-import CrabCoach from '../ui/CrabCoach';
 import {
   DailyMission,
-  getTodayId,
+  Focus,
   generateDailyPrompt,
   getDailyMissions,
   getLevelMeta,
+  getTodayId,
   getUnlocks,
 } from '../state/getawayLogic';
+import BeachScene from '../ui/BeachScene';
+import ReefHome from './ReefHome';
+
+const beachBg = require('../../assets/getaway/beach-bg.jpg');
+const crabImg = require('../../assets/getaway/crab.png');
 
 type Entry = {
   id: string;
   date: string;
+  focus: Focus;
   missionId: string;
   xp: number;
   shells: number;
   reflection?: string;
 };
 
+type LocalTab = 'home' | 'missions' | 'profile' | 'unlocks';
+
 const milestoneConfig = [
-  { xp: 50, label: 'Towel and shade' },
-  { xp: 120, label: 'Dock on the water' },
-  { xp: 220, label: 'Palms and quiet cove' },
-  { xp: 360, label: 'Lighthouse marker' },
-  { xp: 520, label: 'Night fire and reef' },
+  { xp: 50, label: 'Shaded towel spot 🏖️' },
+  { xp: 120, label: 'Wooden dock into the bay 🛶' },
+  { xp: 220, label: 'Palm cluster + hammock 🌴' },
+  { xp: 360, label: 'Soft-lit lighthouse 🗼' },
+  { xp: 520, label: 'Glowing reef at night 🪸' },
 ];
 
+const focusLabel = (f: Focus): string =>
+  f === 'relationships'
+    ? 'Relationships'
+    : f === 'stress'
+    ? 'Stress'
+    : 'Performance';
+
 const SwellGetawayScreen: React.FC = () => {
+  const [focus, setFocus] = useState<Focus>('relationships');
+  const [tab, setTab] = useState<LocalTab>('home');
+
   const [totalXp, setTotalXp] = useState<number>(60);
   const [totalShells, setTotalShells] = useState<number>(6);
   const [entries, setEntries] = useState<Entry[]>([]);
 
   const [reflectionMission, setReflectionMission] =
     useState<DailyMission | null>(null);
-  const [reflectionText, setReflectionText] =
-    useState<string>('');
-  const [showReflection, setShowReflection] =
-    useState<boolean>(false);
+  const [reflectionText, setReflectionText] = useState('');
+  const [showReflection, setShowReflection] = useState(false);
 
-  const [showBeachZoom, setShowBeachZoom] =
-    useState<boolean>(false);
-  const [showCoach, setShowCoach] =
-    useState<boolean>(false);
+  const [showCoach, setShowCoach] = useState(false);
+  const [showReefZoom, setShowReefZoom] = useState(false);
 
-  const [justLeveled, setJustLeveled] =
-    useState<boolean>(false);
+  const [justLeveled, setJustLeveled] = useState(false);
+
+  // demo: cucumbers to collect
+  const [cucumbersAvailable, setCucumbersAvailable] =
+    useState<number>(2);
+
   const levelBannerOpacity = useRef(
     new Animated.Value(0)
   ).current;
@@ -71,35 +89,25 @@ const SwellGetawayScreen: React.FC = () => {
 
   const todayId = getTodayId();
 
-  // Mixed missions: 1 relationship, 1 stress, 1 performance
+  // missions depend on focus
   const missions = useMemo(
-    () =>
-      getDailyMissions(
-        'relationships',
-        todayId
-      ), // focus param ignored in logic
-    [todayId]
+    () => getDailyMissions(focus, todayId),
+    [focus, todayId]
   );
 
   const completedMissionIds = useMemo(
     () =>
       new Set(
         entries
-          .filter(
-            (e) => e.date === todayId
-          )
+          .filter((e) => e.date === todayId)
           .map((e) => e.missionId)
       ),
     [entries, todayId]
   );
 
   const todayPrompt = useMemo(
-    () =>
-      generateDailyPrompt(
-        'relationships',
-        todayId
-      ), // unified prompt
-    [todayId]
+    () => generateDailyPrompt(focus, todayId),
+    [focus, todayId]
   );
 
   const levelMeta = useMemo(
@@ -108,8 +116,7 @@ const SwellGetawayScreen: React.FC = () => {
   );
 
   const unlocks = useMemo(
-    () =>
-      getUnlocks(totalXp, totalShells),
+    () => getUnlocks(totalXp, totalShells),
     [totalXp, totalShells]
   );
 
@@ -118,7 +125,12 @@ const SwellGetawayScreen: React.FC = () => {
     [entries]
   );
 
-  // Level up banner
+  const weekDays = useMemo(
+    () => buildStreakWeek(entries, todayId),
+    [entries, todayId]
+  );
+
+  // level-up toast
   useEffect(() => {
     if (levelMeta.level > lastLevelRef.current) {
       lastLevelRef.current = levelMeta.level;
@@ -135,21 +147,16 @@ const SwellGetawayScreen: React.FC = () => {
             toValue: 0,
             duration: 200,
             useNativeDriver: true,
-          }).start(() =>
-            setJustLeveled(false)
-          );
+          }).start(() => setJustLeveled(false));
         }, 1400);
       });
     }
   }, [levelMeta.level, levelBannerOpacity]);
 
-  // Missions
+  // ----- mission handlers -----
 
-  const startMission = (
-    mission: DailyMission
-  ) => {
-    if (completedMissionIds.has(mission.id))
-      return;
+  const startMission = (mission: DailyMission) => {
+    if (completedMissionIds.has(mission.id)) return;
 
     if (mission.requiresReflection) {
       setReflectionMission(mission);
@@ -165,12 +172,12 @@ const SwellGetawayScreen: React.FC = () => {
     mission: DailyMission,
     note: string
   ) => {
-    if (completedMissionIds.has(mission.id))
-      return;
+    if (completedMissionIds.has(mission.id)) return;
 
     const entry: Entry = {
       id: `${todayId}-${mission.id}`,
       date: todayId,
+      focus,
       missionId: mission.id,
       xp: mission.xp,
       shells: mission.rewardShells,
@@ -178,12 +185,9 @@ const SwellGetawayScreen: React.FC = () => {
     };
 
     setEntries((prev) => [entry, ...prev]);
-    setTotalXp(
-      (prev) => prev + mission.xp
-    );
+    setTotalXp((prev) => prev + mission.xp);
     setTotalShells(
-      (prev) =>
-        prev + mission.rewardShells
+      (prev) => prev + mission.rewardShells
     );
   };
 
@@ -204,9 +208,7 @@ const SwellGetawayScreen: React.FC = () => {
     setReflectionText('');
   };
 
-  const renderMission = (
-    mission: DailyMission
-  ) => {
+  const renderMission = (mission: DailyMission) => {
     const done =
       completedMissionIds.has(mission.id);
     const tierLabel =
@@ -224,7 +226,7 @@ const SwellGetawayScreen: React.FC = () => {
           done && styles.missionDone,
         ]}
         onPress={() => startMission(mission)}
-        activeOpacity={0.9}
+        activeOpacity={0.92}
       >
         <View style={styles.missionLeft}>
           <Text style={styles.missionTier}>
@@ -241,29 +243,18 @@ const SwellGetawayScreen: React.FC = () => {
             {mission.rewardShells} shells
           </Text>
         </View>
-        <View
-          style={
-            styles.missionStatusBubble
-          }
-        >
-          <Text
-            style={
-              styles.missionStatusText
-            }
-          >
-            {done
-              ? 'Completed'
-              : 'Tap to claim'}
+        <View style={styles.missionStatusBubble}>
+          <Text style={styles.missionStatusText}>
+            {done ? 'Logged' : 'Tap to log'}
           </Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  const missionsCompletedCount =
-    missions.filter((m) =>
-      completedMissionIds.has(m.id)
-    ).length;
+  const missionsCompletedCount = missions.filter(
+    (m) => completedMissionIds.has(m.id)
+  ).length;
 
   const handleMilestonePress = (
     xp: number,
@@ -272,470 +263,557 @@ const SwellGetawayScreen: React.FC = () => {
     if (totalXp >= xp) return;
     const remaining = xp - totalXp;
     alert(
-      `You are ${remaining} XP away from ${label}.`
+      `You’re ${remaining} XP away from ${label}.`
     );
   };
 
-  // UI
+  const crabLine = getCrabLine(
+    totalXp,
+    streak,
+    focus
+  );
+
+  const handleCollectCucumber = () => {
+    if (cucumbersAvailable <= 0) return;
+    setCucumbersAvailable((n) => n - 1);
+    setTotalShells((s) => s + 1);
+  };
+
+  // ----- RENDER: HOME TAB -----
+
+  if (tab === 'home') {
+    return (
+      <View style={{ flex: 1 }}>
+        <ReefHome
+          focus={focus}
+          onChangeFocus={setFocus}
+          levelLabel={levelMeta.label}
+          totalXp={totalXp}
+          totalShells={totalShells}
+          unlocks={unlocks}
+          cucumbersAvailable={cucumbersAvailable}
+          onCollectCucumber={handleCollectCucumber}
+          crabLine={crabLine}
+          onOpenCoach={() => setShowCoach(true)}
+        />
+
+        {/* bottom tabs overlay */}
+        <View style={styles.tabsRow}>
+          <TabButton
+            label="Reef"
+            icon="🏝️"
+            active={tab === 'home'}
+            onPress={() => setTab('home')}
+          />
+          <TabButton
+            label="Missions"
+            icon="📋"
+            active={tab === 'missions'}
+            onPress={() => setTab('missions')}
+          />
+          <TabButton
+            label="Profile"
+            icon="👤"
+            active={tab === 'profile'}
+            onPress={() => setTab('profile')}
+          />
+          <TabButton
+            label="Unlocks"
+            icon="🪸"
+            active={tab === 'unlocks'}
+            onPress={() => setTab('unlocks')}
+          />
+        </View>
+
+        <CoachModal
+          visible={showCoach}
+          onClose={() => setShowCoach(false)}
+        />
+
+        <ReflectionModal
+          visible={showReflection}
+          reflectionText={reflectionText}
+          setReflectionText={setReflectionText}
+          onCancel={cancelReflection}
+          onSave={confirmReflection}
+        />
+
+        {/* zoomed reef */}
+        <Modal
+          visible={showReefZoom}
+          transparent
+          animationType="fade"
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() =>
+              setShowReefZoom(false)
+            }
+          />
+          <View style={styles.beachZoomCard}>
+            <BeachScene
+              unlocks={unlocks}
+              levelLabel={levelMeta.label}
+              totalShells={totalShells}
+              cucumbersAvailable={
+                cucumbersAvailable
+              }
+              onCollectCucumber={
+                handleCollectCucumber
+              }
+            />
+          </View>
+        </Modal>
+      </View>
+    );
+  }
+
+  // ----- RENDER: OTHER TABS -----
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>
-          Swell Getaway
-        </Text>
-        <View style={styles.levelTag}>
-          <Text style={styles.levelTagText}>
-            Lv {levelMeta.level} · {totalXp} XP
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.headerMetricsRow}>
-        <Text style={styles.headerMetric}>
-          {missionsCompletedCount}/
-          {missions.length} today
-        </Text>
-        <Text style={styles.headerMetric}>
-          {streak > 0
-            ? `${streak}-day streak`
-            : 'Streak ready'}
-        </Text>
-      </View>
-
-      <Text style={styles.subtitle}>
-        One calm place for small reps that
-        touch your work, stress, and
-        relationships.
-      </Text>
-
-      {justLeveled && (
-        <Animated.View
-          style={[
-            styles.levelUpBanner,
-            { opacity: levelBannerOpacity },
-          ]}
-        >
-          <Text style={styles.levelUpText}>
-            New level reached:{' '}
-            {levelMeta.label}
-          </Text>
-        </Animated.View>
-      )}
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: 40,
-        }}
-      >
-        {/* Beach as home. Long press to zoom, crab opens coach. */}
-        <Pressable
-          onLongPress={() =>
-            setShowBeachZoom(true)
-          }
-        >
-          <BeachScene
-            unlocks={unlocks}
-            levelLabel={levelMeta.label}
-            totalShells={totalShells}
-            compact
-            onOpenCrab={() =>
-              setShowCoach(true)
-            }
-          />
-        </Pressable>
-
-        {/* Progress */}
-        <View
-          style={styles.progressColumn}
-        >
-          <View
-            style={
-              styles.progressBarBg
-            }
-          >
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${
-                    levelMeta.progress *
-                    100
-                  }%`,
-                },
-              ]}
-            />
+    <ImageBackground
+      source={beachBg}
+      style={styles.bg}
+      imageStyle={styles.bgImage}
+    >
+      <View style={styles.overlay}>
+        {/* summary */}
+        <View style={styles.summaryRow}>
+          <View>
+            <Text style={styles.summaryText}>
+              {missionsCompletedCount}/
+              {missions.length} missions
+              today
+            </Text>
+            <Text style={styles.summaryText}>
+              Streak:{' '}
+              {streak > 0
+                ? `${streak} days`
+                : 'start anytime'}
+            </Text>
           </View>
-          <Text
-            style={styles.progressText}
-          >
-            {Math.round(
-              levelMeta.progress *
-                100
-            )}
-            % to next level
-          </Text>
-          <Text
-            style={styles.streakText}
-          >
-            {streak > 0
-              ? `${streak}-day streak`
-              : 'One honest rep starts it'}
-          </Text>
-        </View>
-
-        {/* Riff / AI hook */}
-        <CrabCoach
-          totalXp={totalXp}
-          streak={streak}
-          totalShells={totalShells}
-          onOpenCrab={() =>
-            setShowCoach(true)
-          }
-        />
-
-        {/* Today prompt */}
-        <View style={styles.card}>
-          <Text
-            style={styles.cardLabel}
-          >
-            Today’s tiny rep
-          </Text>
-          <Text
-            style={styles.cardPrompt}
-          >
-            {todayPrompt.text}
-          </Text>
-        </View>
-
-        {/* Next unlocks */}
-        <Text
-          style={styles.sectionLabel}
-        >
-          Next unlocks
-        </Text>
-        <View
-          style={styles.milestoneRow}
-        >
-          {milestoneConfig.map((m) => {
-            const done =
-              totalXp >= m.xp;
-            return (
-              <TouchableOpacity
-                key={m.xp}
-                style={[
-                  styles.milestonePill,
-                  done &&
-                    styles.milestonePillDone,
-                ]}
-                activeOpacity={0.9}
-                onPress={() =>
-                  handleMilestonePress(
-                    m.xp,
-                    m.label
-                  )
-                }
-              >
-                <Text
-                  style={[
-                    styles.milestoneLabel,
-                    done &&
-                      styles.milestoneLabelDone,
-                  ]}
-                >
-                  {m.xp} XP
-                </Text>
-                <Text
-                  style={[
-                    styles.milestoneText,
-                    done &&
-                      styles.milestoneLabelDone,
-                  ]}
-                >
-                  {m.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Missions */}
-        <Text
-          style={styles.sectionLabel}
-        >
-          Today’s missions
-        </Text>
-        <View
-          style={styles.missionsWrap}
-        >
-          {missions.map(
-            renderMission
-          )}
-        </View>
-
-        {/* History */}
-        <Text
-          style={styles.sectionLabel}
-        >
-          Recent progress
-        </Text>
-        {entries.length === 0 ? (
-          <Text
-            style={styles.historyEmpty}
-          >
-            Your next real moment will
-            land here.
-          </Text>
-        ) : (
-          entries.map((item) => (
-            <Text
-              key={item.id}
-              style={
-                styles.historyItem
-              }
-            >
-              {item.date} · +
-              {item.xp} XP · +
-              {item.shells} shells
-              {item.reflection
-                ? `  "${item.reflection}"`
-                : ''}
+          <View style={styles.summaryPill}>
+            <Text style={styles.summaryPillText}>
+              Lv {levelMeta.level}
             </Text>
-          ))
-        )}
-      </ScrollView>
-
-      {/* Beach zoom */}
-      <Modal
-        visible={showBeachZoom}
-        transparent
-        animationType="fade"
-      >
-        <Pressable
-          style={
-            styles.modalBackdrop
-          }
-          onPress={() =>
-            setShowBeachZoom(false)
-          }
-        />
-        <View
-          style={
-            styles.beachZoomCard
-          }
-        >
-          <BeachScene
-            unlocks={unlocks}
-            levelLabel={levelMeta.label}
-            totalShells={totalShells}
-            compact={false}
-          />
-          <Text
-            style={
-              styles.beachZoomText
-            }
-          >
-            This shoreline reflects the
-            small choices you keep
-            making.
-          </Text>
+            <Text style={styles.summaryPillSub}>
+              {totalXp} XP · {totalShells} 🐚
+            </Text>
+          </View>
         </View>
-      </Modal>
 
-      {/* Swell AI coach hook */}
-      <Modal
-        visible={showCoach}
-        transparent
-        animationType="fade"
-      >
-        <KeyboardAvoidingView
-          style={
-            styles.modalOverlay
-          }
-          behavior={
-            Platform.OS === 'ios'
-              ? 'padding'
-              : undefined
-          }
-        >
-          <Pressable
-            style={
-              styles.modalBackdrop
-            }
-            onPress={() =>
-              setShowCoach(false)
-            }
-          />
-          <View
-            style={styles.modalCard}
-          >
-            <Text
-              style={styles.modalTitle}
-            >
-              Swell coach space
-            </Text>
-            <Text
-              style={
-                styles.modalSubtitle
-              }
-            >
-              In the full product this
-              button would open the
-              main Swell AI therapist
-              with context from
-              today’s missions and
-              reflections, so your
-              coach sees what you are
-              practicing.
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Describe a situation or question you would send to Swell."
-              placeholderTextColor="#9BA8B3"
-              multiline
-            />
+        {/* streak week */}
+        <View style={styles.weekStrip}>
+          {weekDays.map((d) => (
             <View
-              style={
-                styles.modalButtonsRow
-              }
+              key={d.date}
+              style={[
+                styles.dayCell,
+                d.isToday && styles.dayToday,
+              ]}
             >
-              <TouchableOpacity
-                style={
-                  styles.modalSecondary
-                }
-                onPress={() =>
-                  setShowCoach(
-                    false
-                  )
-                }
+              <Text style={styles.dayLabel}>
+                {d.label}
+              </Text>
+              <Text
+                style={[
+                  styles.dayIcon,
+                  d.hit && styles.dayIconHit,
+                ]}
               >
-                <Text
-                  style={
-                    styles.modalSecondaryText
-                  }
-                >
-                  Close
+                {d.hit ? '🪸' : '·'}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* level up toast */}
+        {justLeveled && (
+          <Animated.View
+            style={[
+              styles.levelUpBanner,
+              { opacity: levelBannerOpacity },
+            ]}
+          >
+            <Text style={styles.levelUpText}>
+              New level reached:{' '}
+              {levelMeta.label}
+            </Text>
+          </Animated.View>
+        )}
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={
+            styles.scrollContent
+          }
+        >
+          {tab === 'missions' && (
+            <View>
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>
+                  Focus
                 </Text>
-              </TouchableOpacity>
-              <View
-                style={
-                  styles.modalPrimary
-                }
-              >
+                <View
+                  style={styles.focusChipsRow}
+                >
+                  {(['relationships',
+                    'stress',
+                    'performance'] as Focus[]).map(
+                    (f) => (
+                      <TouchableOpacity
+                        key={f}
+                        onPress={() =>
+                          setFocus(f)
+                        }
+                        style={[
+                          styles.focusChip,
+                          focus === f &&
+                            styles.focusChipActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.focusChipText,
+                            focus ===
+                              f &&
+                              styles.focusChipTextActive,
+                          ]}
+                        >
+                          {focusLabel(
+                            f
+                          )}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.card}>
+                <Text
+                  style={styles.cardLabel}
+                >
+                  Today’s tiny rep
+                </Text>
                 <Text
                   style={
-                    styles.modalPrimaryText
+                    styles.cardPrompt
                   }
                 >
-                  Send to Swell AI
+                  {todayPrompt.text}
                 </Text>
               </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
-      {/* Reflection modal */}
-      <Modal
-        visible={showReflection}
-        transparent
-        animationType="fade"
-      >
-        <KeyboardAvoidingView
-          style={
-            styles.modalOverlay
-          }
-          behavior={
-            Platform.OS === 'ios'
-              ? 'padding'
-              : undefined
-          }
+              <Text
+                style={
+                  styles.sectionLabel
+                }
+              >
+                Today’s missions
+              </Text>
+              {missions.map(
+                renderMission
+              )}
+            </View>
+          )}
+
+          {tab === 'profile' &&
+            renderProfile(
+              entries,
+              streak,
+              levelMeta.level,
+              totalXp,
+              totalShells
+            )}
+
+          {tab === 'unlocks' &&
+            renderUnlocks(
+              milestoneConfig,
+              totalXp,
+              unlocks,
+              handleMilestonePress
+            )}
+        </ScrollView>
+
+        {/* tabs */}
+        <View style={styles.tabsRow}>
+          <TabButton
+            label="Reef"
+            icon="🏝️"
+            active={tab === 'home'}
+            onPress={() => setTab('home')}
+          />
+          <TabButton
+            label="Missions"
+            icon="📋"
+            active={tab === 'missions'}
+            onPress={() => setTab('missions')}
+          />
+          <TabButton
+            label="Profile"
+            icon="👤"
+            active={tab === 'profile'}
+            onPress={() => setTab('profile')}
+          />
+          <TabButton
+            label="Unlocks"
+            icon="🪸"
+            active={tab === 'unlocks'}
+            onPress={() => setTab('unlocks')}
+          />
+        </View>
+
+        <CoachModal
+          visible={showCoach}
+          onClose={() => setShowCoach(false)}
+        />
+
+        <ReflectionModal
+          visible={showReflection}
+          reflectionText={reflectionText}
+          setReflectionText={setReflectionText}
+          onCancel={cancelReflection}
+          onSave={confirmReflection}
+        />
+
+        <Modal
+          visible={showReefZoom}
+          transparent
+          animationType="fade"
         >
           <Pressable
-            style={
-              styles.modalBackdrop
+            style={styles.modalBackdrop}
+            onPress={() =>
+              setShowReefZoom(false)
             }
-            onPress={cancelReflection}
           />
-          <View
-            style={styles.modalCard}
-          >
-            <Text
-              style={styles.modalTitle}
-            >
-              Log your rep
-            </Text>
-            <Text
-              style={
-                styles.modalSubtitle
+          <View style={styles.beachZoomCard}>
+            <BeachScene
+              unlocks={unlocks}
+              levelLabel={
+                levelMeta.label
               }
-            >
-              One clear line about
-              what you tried or how it
-              went.
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="For example: Took a breath before answering instead of snapping."
-              placeholderTextColor="#9BA8B3"
-              value={reflectionText}
-              onChangeText={
-                setReflectionText
+              totalShells={
+                totalShells
               }
-              multiline
+              cucumbersAvailable={
+                cucumbersAvailable
+              }
+              onCollectCucumber={
+                handleCollectCucumber
+              }
             />
-            <View
-              style={
-                styles.modalButtonsRow
-              }
-            >
-              <TouchableOpacity
-                style={
-                  styles.modalSecondary
-                }
-                onPress={
-                  cancelReflection
-                }
-              >
-                <Text
-                  style={
-                    styles.modalSecondaryText
-                  }
-                >
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={
-                  styles.modalPrimary
-                }
-                onPress={
-                  confirmReflection
-                }
-              >
-                <Text
-                  style={
-                    styles.modalPrimaryText
-                  }
-                >
-                  Save and claim
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </ImageBackground>
   );
 };
 
-// Helpers
+/* ------- Sub components ------- */
 
-function computeStreak(
-  entries: Entry[]
-): number {
+const TabButton = ({
+  label,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon: string;
+  active: boolean;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.9}
+    style={[
+      styles.tabButton,
+      active && styles.tabButtonActive,
+    ]}
+  >
+    <Text style={styles.tabIcon}>
+      {icon}
+    </Text>
+    <Text
+      style={[
+        styles.tabLabel,
+        active && styles.tabLabelActive,
+      ]}
+    >
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
+const CoachModal = ({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType="fade"
+  >
+    <KeyboardAvoidingView
+      style={styles.modalOverlay}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
+    >
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={onClose}
+      />
+      <View style={styles.modalCard}>
+        <View style={styles.modalCrabRow}>
+          <Animated.Image
+            source={crabImg}
+            style={styles.modalCrab}
+          />
+          <View>
+            <Text style={styles.modalTitle}>
+              Reef Coach
+            </Text>
+            <Text
+              style={
+                styles.modalSubtitle
+              }
+            >
+              In Swell, this opens the AI
+              coach with your focus,
+              streak, and reps as context.
+            </Text>
+          </View>
+        </View>
+        <TextInput
+          style={styles.modalInput}
+          placeholder="Type the situation or message you’d send."
+          placeholderTextColor="#9BA8B3"
+          multiline
+        />
+        <View
+          style={styles.modalButtonsRow}
+        >
+          <TouchableOpacity
+            style={
+              styles.modalSecondary
+            }
+            onPress={onClose}
+          >
+            <Text
+              style={
+                styles.modalSecondaryText
+              }
+            >
+              Close
+            </Text>
+          </TouchableOpacity>
+          <View
+            style={styles.modalPrimary}
+          >
+            <Text
+              style={
+                styles.modalPrimaryText
+              }
+            >
+              Send (demo)
+            </Text>
+          </View>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  </Modal>
+);
+
+const ReflectionModal = ({
+  visible,
+  reflectionText,
+  setReflectionText,
+  onCancel,
+  onSave,
+}: {
+  visible: boolean;
+  reflectionText: string;
+  setReflectionText: (t: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType="fade"
+  >
+    <KeyboardAvoidingView
+      style={styles.modalOverlay}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
+    >
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={onCancel}
+      />
+      <View style={styles.modalCard}>
+        <Text style={styles.modalTitle}>
+          Log your rep
+        </Text>
+        <Text style={styles.modalSubtitle}>
+          One honest line is enough.
+        </Text>
+        <TextInput
+          style={styles.modalInput}
+          placeholder="For example: Took a breath before answering instead of snapping."
+          placeholderTextColor="#9BA8B3"
+          value={reflectionText}
+          onChangeText={setReflectionText}
+          multiline
+        />
+        <View
+          style={styles.modalButtonsRow}
+        >
+          <TouchableOpacity
+            style={
+              styles.modalSecondary
+            }
+            onPress={onCancel}
+          >
+            <Text
+              style={
+                styles.modalSecondaryText
+              }
+            >
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalPrimary}
+            onPress={onSave}
+          >
+            <Text
+              style={
+                styles.modalPrimaryText
+              }
+            >
+              Save &amp; claim
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  </Modal>
+);
+
+/* ------- helpers ------- */
+
+function computeStreak(entries: Entry[]): number {
   if (!entries.length) return 0;
   const dates = Array.from(
     new Set(entries.map((e) => e.date))
@@ -751,98 +829,321 @@ function computeStreak(
   return streak;
 }
 
-// Styles
+function computeLongestStreak(
+  entries: Entry[]
+): number {
+  if (!entries.length) return 0;
+  const unique = Array.from(
+    new Set(entries.map((e) => e.date))
+  ).sort();
+  let longest = 1;
+  let current = 1;
+  for (let i = 1; i < unique.length; i++) {
+    const prev = new Date(unique[i - 1]);
+    const cur = new Date(unique[i]);
+    prev.setDate(prev.getDate() + 1);
+    if (
+      prev.toISOString().slice(0, 10) ===
+      unique[i]
+    ) {
+      current++;
+      longest = Math.max(
+        longest,
+        current
+      );
+    } else {
+      current = 1;
+    }
+  }
+  return longest;
+}
+
+function buildStreakWeek(
+  entries: Entry[],
+  todayId: string
+) {
+  const hitDates = new Set(
+    entries.map((e) => e.date)
+  );
+  const base = new Date(todayId);
+  const out: {
+    date: string;
+    label: string;
+    hit: boolean;
+    isToday: boolean;
+  }[] = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(base);
+    d.setDate(d.getDate() - i);
+    const iso = d
+      .toISOString()
+      .slice(0, 10);
+    const weekday = d
+      .toLocaleDateString('en-US', {
+        weekday: 'short',
+      })
+      .charAt(0);
+    out.push({
+      date: iso,
+      label: weekday,
+      hit: hitDates.has(iso),
+      isToday: iso === todayId,
+    });
+  }
+  return out;
+}
+
+function getCrabLine(
+  totalXp: number,
+  streak: number,
+  focus: Focus
+): string {
+  if (streak >= 5) {
+    return 'You keep showing up. Let’s pick one situation worth doing on purpose.';
+  }
+  if (totalXp < 40) {
+    return 'Welcome in. One honest rep is enough for today.';
+  }
+  if (focus === 'relationships') {
+    return 'Choose one conversation to handle with more clarity or care.';
+  }
+  if (focus === 'stress') {
+    return 'Notice one spike and give yourself a slow breath before you answer.';
+  }
+  if (focus === 'performance') {
+    return 'Protect a small block for the work that actually matters.';
+  }
+  return 'Wherever you are tonight, we can turn one moment into practice.';
+}
+
+function renderProfile(
+  entries: Entry[],
+  streak: number,
+  level: number,
+  totalXp: number,
+  totalShells: number
+) {
+  const longest = computeLongestStreak(entries);
+
+  return (
+    <View>
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>
+          You
+        </Text>
+        <Text style={styles.profileLine}>
+          Level {level} · {totalXp} XP total
+        </Text>
+        <Text style={styles.profileLine}>
+          Shells banked: {totalShells}
+        </Text>
+        <Text style={styles.profileLine}>
+          Current streak: {streak || 0} days
+        </Text>
+        <Text style={styles.profileLine}>
+          Longest streak: {longest || 0} days
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>
+          Recent reps
+        </Text>
+        {entries.length === 0 ? (
+          <Text style={styles.historyEmpty}>
+            Once you log missions, they’ll
+            land here.
+          </Text>
+        ) : (
+          entries
+            .slice(0, 10)
+            .map((e) => (
+              <Text
+                key={e.id}
+                style={styles.historyItem}
+              >
+                {e.date} · +{e.xp} XP · +
+                {e.shells} 🐚
+                {e.reflection
+                  ? ` — ${e.reflection}`
+                  : ''}
+              </Text>
+            ))
+        )}
+      </View>
+    </View>
+  );
+}
+
+function renderUnlocks(
+  milestones: { xp: number; label: string }[],
+  totalXp: number,
+  unlocks: string[],
+  onPress: (xp: number, label: string) => void
+) {
+  const coralPieces =
+    unlocks.filter((u) =>
+      u.startsWith('coral')
+    ).length;
+
+  return (
+    <View>
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>
+          Reef growth
+        </Text>
+        <Text style={styles.cardPrompt}>
+          Each milestone adds a new piece:
+          shade, dock, palms, lighthouse,
+          and deeper reef.
+        </Text>
+        <View style={styles.coralRowUnlock}>
+          {Array.from({ length: 5 }).map(
+            (_, i) => (
+              <Text
+                key={i}
+                style={styles.coralIcon}
+              >
+                {i < coralPieces
+                  ? '🪸'
+                  : '·'}
+              </Text>
+            )
+          )}
+        </View>
+      </View>
+
+      <Text style={styles.sectionLabel}>
+        Milestones
+      </Text>
+      {milestones.map((m) => {
+        const done = totalXp >= m.xp;
+        return (
+          <TouchableOpacity
+            key={m.xp}
+            onPress={() =>
+              onPress(m.xp, m.label)
+            }
+            activeOpacity={0.9}
+            style={[
+              styles.milestonePill,
+              done &&
+                styles.milestonePillDone,
+            ]}
+          >
+            <Text
+              style={[
+                styles.milestoneLabel,
+                done &&
+                  styles.milestoneLabelDone,
+              ]}
+            >
+              {m.xp} XP
+            </Text>
+            <Text
+              style={[
+                styles.milestoneText,
+                done &&
+                  styles.milestoneLabelDone,
+              ]}
+            >
+              {m.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ------- styles ------- */
 
 const styles = StyleSheet.create({
-  container: {
+  bg: { flex: 1 },
+  bgImage: { resizeMode: 'cover' },
+  overlay: {
     flex: 1,
-    paddingHorizontal: 18,
-    paddingTop: 26,
-    backgroundColor: '#F5F2EC',
+    paddingHorizontal: 16,
+    paddingTop: 32,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.14)',
   },
-  headerRow: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 4,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#12263A',
+  summaryText: {
+    fontSize: 10,
+    color: '#E3EDF8',
   },
-  levelTag: {
-    marginLeft: 8,
+  summaryPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: '#123B5D',
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'flex-end',
   },
-  levelTagText: {
-    fontSize: 10,
-    color: '#F5F2EC',
-  },
-  headerMetricsRow: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  headerMetric: {
-    fontSize: 10,
-    color: '#8C9BAA',
-    marginRight: 12,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#5B6E83',
-    marginBottom: 6,
-  },
-  levelUpBanner: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#123B5D',
-    marginBottom: 6,
-  },
-  levelUpText: {
+  summaryPillText: {
     fontSize: 11,
     color: '#F5F2EC',
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  progressColumn: {
+  summaryPillSub: {
+    fontSize: 9,
+    color: '#D0DCEF',
+  },
+  weekStrip: {
+    flexDirection: 'row',
+    alignSelf: 'center',
     marginBottom: 6,
-  },
-  progressBarBg: {
-    width: '100%',
-    height: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#E0E4EA',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  dayCell: {
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  dayLabel: {
+    fontSize: 8,
+    color: '#C8D6EA',
+    marginBottom: 1,
+  },
+  dayIcon: {
+    fontSize: 10,
+    color: '#7F8EA5',
+  },
+  dayIconHit: {
+    color: '#FBE9A9',
+  },
+  dayToday: {
+    borderBottomWidth: 1,
+    borderColor: '#FBE9A9',
+  },
+  levelUpBanner: {
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(5,24,54,0.96)',
     marginBottom: 4,
   },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#2C6BAA',
-  },
-  progressText: {
+  levelUpText: {
     fontSize: 10,
-    color: '#5B6E83',
+    color: '#F5F2EC',
   },
-  streakText: {
-    fontSize: 10,
-    color: '#8C9BAA',
-    marginTop: 2,
+  scrollContent: {
+    paddingBottom: 70,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.97)',
     borderRadius: 18,
     padding: 12,
-    marginTop: 4,
     marginBottom: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   cardLabel: {
     fontSize: 10,
@@ -856,58 +1157,48 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 10,
-    color: '#9BA8B3',
-    marginTop: 6,
-    marginBottom: 3,
+    color: '#E0E7EF',
+    marginTop: 4,
+    marginBottom: 2,
     textTransform: 'uppercase',
   },
-  milestoneRow: {
+  focusChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 2,
+    marginTop: 4,
   },
-  milestonePill: {
+  focusChip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E4EA',
+    borderColor: '#D3DCE6',
     marginRight: 6,
     marginBottom: 4,
   },
-  milestonePillDone: {
+  focusChipActive: {
     backgroundColor: '#123B5D',
     borderColor: '#123B5D',
   },
-  milestoneLabel: {
-    fontSize: 9,
-    color: '#8C9BAA',
+  focusChipText: {
+    fontSize: 10,
+    color: '#64748B',
   },
-  milestoneLabelDone: {
+  focusChipTextActive: {
     color: '#FFFFFF',
-  },
-  milestoneText: {
-    fontSize: 9,
-    color: '#5B6E83',
-  },
-  missionsWrap: {
-    marginBottom: 4,
+    fontWeight: '500',
   },
   missionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.98)',
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 14,
-    marginBottom: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    marginBottom: 5,
   },
   missionDone: {
-    backgroundColor: '#E3F4E8',
+    backgroundColor: 'rgba(211,241,220,0.98)',
     borderColor: '#8AC79A',
     borderWidth: 1,
   },
@@ -940,12 +1231,83 @@ const styles = StyleSheet.create({
   },
   historyItem: {
     fontSize: 11,
-    color: '#5B6E83',
+    color: '#4B5563',
     marginBottom: 2,
   },
   historyEmpty: {
     fontSize: 11,
-    color: '#B0B8C2',
+    color: '#9CA3AF',
+  },
+  profileLine: {
+    fontSize: 12,
+    color: '#111827',
+    marginBottom: 2,
+  },
+  coralRowUnlock: {
+    flexDirection: 'row',
+    marginTop: 6,
+  },
+  coralIcon: {
+    fontSize: 14,
+    marginRight: 2,
+    color: '#F97316',
+  },
+  milestonePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    marginBottom: 4,
+    backgroundColor: 'rgba(5,24,54,0.35)',
+  },
+  milestonePillDone: {
+    backgroundColor: 'rgba(5,24,54,0.96)',
+    borderColor: '#FFFFFF',
+  },
+  milestoneLabel: {
+    fontSize: 9,
+    color: '#E0E7EF',
+  },
+  milestoneLabelDone: {
+    color: '#FFFFFF',
+  },
+  milestoneText: {
+    fontSize: 9,
+    color: '#F5F2EC',
+  },
+  tabsRow: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  tabButtonActive: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+  },
+  tabIcon: {
+    fontSize: 14,
+    color: '#E5E7EB',
+  },
+  tabLabel: {
+    fontSize: 8,
+    color: '#9CA3AF',
+  },
+  tabLabelActive: {
+    color: '#F9FAFB',
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
@@ -954,27 +1316,32 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.32)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+  },
+  modalCrabRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  modalCrab: {
+    width: 40,
+    height: 40,
+    marginRight: 8,
+    resizeMode: 'contain',
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#12263A',
-    marginBottom: 4,
+    color: '#111827',
   },
   modalSubtitle: {
     fontSize: 11,
-    color: '#5B6E83',
-    marginBottom: 8,
+    color: '#6B7280',
+    marginTop: 2,
   },
   modalInput: {
     minHeight: 70,
@@ -983,7 +1350,8 @@ const styles = StyleSheet.create({
     borderColor: '#D2D8DE',
     padding: 8,
     fontSize: 12,
-    color: '#12263A',
+    color: '#111827',
+    marginTop: 10,
     marginBottom: 10,
   },
   modalButtonsRow: {
@@ -998,17 +1366,17 @@ const styles = StyleSheet.create({
   },
   modalSecondaryText: {
     fontSize: 11,
-    color: '#8C9BAA',
+    color: '#6B7280',
   },
   modalPrimary: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: '#123B5D',
+    backgroundColor: '#111827',
   },
   modalPrimaryText: {
     fontSize: 11,
-    color: '#F5F2EC',
+    color: '#F9FAFB',
     fontWeight: '500',
   },
   beachZoomCard: {
@@ -1018,15 +1386,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#F5F2EC',
-    paddingBottom: 10,
-  },
-  beachZoomText: {
-    fontSize: 11,
-    color: '#4D5B6A',
-    paddingHorizontal: 10,
-    paddingTop: 6,
   },
 });
 
 export default SwellGetawayScreen;
-

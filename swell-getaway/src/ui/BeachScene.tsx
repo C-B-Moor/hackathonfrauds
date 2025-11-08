@@ -1,11 +1,18 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 type BeachSceneProps = {
   unlocks: string[];
   levelLabel: string;
   totalShells: number;
-  compact?: boolean; // when false, used for zoomed-in view
+  compact?: boolean;
+  cucumbersAvailable?: number;
+  onCollectCucumber?: () => void;
 };
 
 const BeachScene: React.FC<BeachSceneProps> = ({
@@ -13,22 +20,20 @@ const BeachScene: React.FC<BeachSceneProps> = ({
   levelLabel,
   totalShells,
   compact = true,
+  cucumbersAvailable,
+  onCollectCucumber,
 }) => {
   const hasTowel = unlocks.includes('towel');
   const hasPalms = unlocks.includes('palms');
   const hasDock = unlocks.includes('dock');
   const hasLighthouse = unlocks.includes('lighthouse');
-  const hasCoral = unlocks.includes('coral');
-  const hasReef = unlocks.includes('reef');
-  const hasFish = unlocks.includes('fish');
-  const hasCampfire = unlocks.includes('campfire');
 
-  const height = compact ? 170 : 320;
-  const borderRadius = compact ? 24 : 26;
+  const height = compact ? 180 : 260;
+  const radius = compact ? 22 : 26;
 
   return (
-    <View style={[styles.wrapper, { height, borderRadius }]}>
-      {/* Top labels */}
+    <View style={[styles.wrapper, { height, borderRadius: radius }]}>
+      {/* labels */}
       <View style={styles.levelPill}>
         <Text style={styles.levelText}>{levelLabel}</Text>
       </View>
@@ -36,52 +41,65 @@ const BeachScene: React.FC<BeachSceneProps> = ({
         <Text style={styles.shellText}>🐚 {totalShells}</Text>
       </View>
 
-      {/* Sky layers */}
-      <View style={styles.skyBase} />
-      <View style={styles.skySoft} />
-      {/* Sun */}
-      <View style={styles.sun} />
-      {/* Clouds */}
-      <Text style={styles.cloudLeft}>☁️</Text>
-      <Text style={styles.cloudRight}>☁️</Text>
+      {/* sky + sea + sand */}
+      <View style={styles.sky} />
+      <View style={styles.sea} />
+      <View style={styles.sand} />
 
-      {/* Sea bands for subtle texture */}
-      <View style={styles.seaBand1} />
-      <View style={styles.seaBand2} />
-      <View style={styles.seaBand3} />
-
-      {/* Sand with subtle "texture" bars */}
-      <View style={styles.sandBase} />
-      <View style={styles.sandBand1} />
-      <View style={styles.sandBand2} />
-
-      {/* Beach objects */}
+      {/* simple “unlocks” using emojis for now */}
       {hasPalms && <Text style={styles.palms}>🌴</Text>}
-      {hasLighthouse && <Text style={styles.lighthouse}>🗼</Text>}
       {hasDock && <Text style={styles.dock}>🛶</Text>}
       {hasTowel && <Text style={styles.towel}>🏖️</Text>}
-      {hasCampfire && <Text style={styles.campfire}>🔥</Text>}
+      {hasLighthouse && <Text style={styles.lighthouse}>🗼</Text>}
 
-      {/* Underwater life */}
-      {(hasCoral || hasReef) && <Text style={styles.coral}>🪸</Text>}
-      {hasReef && <Text style={styles.reef}>🪸</Text>}
-      {hasFish && <Text style={styles.fish}>🐟</Text>}
-
-      {/* Overlays */}
-      <View style={styles.vignetteTop} />
-      <View style={styles.vignetteBottom} />
+      {/* cucumbers to collect */}
+      {!!cucumbersAvailable &&
+        cucumbersAvailable > 0 &&
+        onCollectCucumber && (
+          <Pressable
+            onPress={onCollectCucumber}
+            style={styles.cucumberBadge}
+          >
+            <Text style={styles.cucumberText}>
+              🥒 x{cucumbersAvailable} · tap to collect
+            </Text>
+          </Pressable>
+        )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E3E0DA',
-    backgroundColor: '#BFD8F5',
-    position: 'relative',
+    borderColor: '#E2E2E2',
+    backgroundColor: '#A5D8FF',
+    marginBottom: 8,
+  },
+  sky: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+    backgroundColor: '#9ED5FF',
+  },
+  sea: {
+    position: 'absolute',
+    top: '35%',
+    left: 0,
+    right: 0,
+    height: '25%',
+    backgroundColor: '#1E88E5',
+  },
+  sand: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '35%',
+    backgroundColor: '#FFE0B2',
   },
   levelPill: {
     position: 'absolute',
@@ -90,13 +108,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(8,33,61,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     zIndex: 10,
   },
   levelText: {
-    fontSize: 11,
-    color: '#F6F3EE',
-    fontWeight: '500',
+    fontSize: 10,
+    color: '#F5F5F5',
   },
   shellPill: {
     position: 'absolute',
@@ -105,166 +122,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(244,224,196,0.96)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     zIndex: 10,
   },
   shellText: {
-    fontSize: 11,
-    color: '#5B3D25',
-    fontWeight: '500',
-  },
-  skyBase: {
-    position: 'absolute',
-    top: 0,
-    left: -16,
-    right: -16,
-    height: '45%',
-    backgroundColor: '#C8DCF6',
-  },
-  skySoft: {
-    position: 'absolute',
-    top: '15%',
-    left: -16,
-    right: -16,
-    height: '20%',
-    backgroundColor: '#D6E3FA',
-    opacity: 0.7,
-  },
-  sun: {
-    position: 'absolute',
-    top: 18,
-    right: 40,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FFE6A3',
-  },
-  cloudLeft: {
-    position: 'absolute',
-    top: 18,
-    left: 24,
-    fontSize: 16,
-    opacity: 0.9,
-  },
-  cloudRight: {
-    position: 'absolute',
-    top: 32,
-    right: 18,
-    fontSize: 16,
-    opacity: 0.9,
-  },
-  seaBand1: {
-    position: 'absolute',
-    top: '40%',
-    left: -16,
-    right: -16,
-    height: '12%',
-    backgroundColor: '#6FB7E9',
-  },
-  seaBand2: {
-    position: 'absolute',
-    top: '46%',
-    left: -16,
-    right: -16,
-    height: '10%',
-    backgroundColor: '#5CA7DD',
-  },
-  seaBand3: {
-    position: 'absolute',
-    top: '52%',
-    left: -16,
-    right: -16,
-    height: '8%',
-    backgroundColor: '#4E98CF',
-    opacity: 0.9,
-  },
-  sandBase: {
-    position: 'absolute',
-    bottom: -4,
-    left: -16,
-    right: -16,
-    height: '32%',
-    backgroundColor: '#F4E0C4',
-  },
-  sandBand1: {
-    position: 'absolute',
-    bottom: '14%',
-    left: -16,
-    right: -16,
-    height: 4,
-    backgroundColor: 'rgba(214,189,151,0.45)',
-  },
-  sandBand2: {
-    position: 'absolute',
-    bottom: '6%',
-    left: -16,
-    right: -16,
-    height: 3,
-    backgroundColor: 'rgba(214,189,151,0.32)',
+    fontSize: 10,
+    color: '#3F3D3D',
   },
   palms: {
     position: 'absolute',
-    bottom: '26%',
+    bottom: '22%',
     left: 18,
-    fontSize: 26,
-  },
-  lighthouse: {
-    position: 'absolute',
-    top: '26%',
-    right: 18,
-    fontSize: 22,
+    fontSize: 24,
   },
   dock: {
     position: 'absolute',
-    top: '54%',
-    left: 26,
+    bottom: '22%',
+    right: 26,
     fontSize: 22,
   },
   towel: {
     position: 'absolute',
-    bottom: '10%',
-    left: 44,
+    bottom: '8%',
+    left: 60,
     fontSize: 22,
   },
-  campfire: {
+  lighthouse: {
     position: 'absolute',
-    bottom: '9%',
-    right: 60,
-    fontSize: 20,
+    top: '20%',
+    right: 16,
+    fontSize: 22,
   },
-  coral: {
+  cucumberBadge: {
     position: 'absolute',
-    bottom: '4%',
-    right: 26,
-    fontSize: 20,
+    bottom: 8,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  reef: {
-    position: 'absolute',
-    bottom: '8%',
-    right: 44,
-    fontSize: 18,
-  },
-  fish: {
-    position: 'absolute',
-    top: '50%',
-    right: 52,
-    fontSize: 18,
-  },
-  vignetteTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 36,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-  },
-  vignetteBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 32,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+  cucumberText: {
+    fontSize: 9,
+    color: '#F5F5F5',
   },
 });
 

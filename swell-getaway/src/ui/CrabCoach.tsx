@@ -1,14 +1,16 @@
 import React from 'react';
 import {
-  View,
-  Text,
   StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
+import { Focus } from '../state/getawayLogic';
 
 type CrabCoachProps = {
   totalXp: number;
   streak: number;
+  focus: Focus;
   totalShells: number;
   onOpenCrab?: () => void;
 };
@@ -16,10 +18,11 @@ type CrabCoachProps = {
 const CrabCoach: React.FC<CrabCoachProps> = ({
   totalXp,
   streak,
+  focus,
   totalShells,
   onOpenCrab,
 }) => {
-  const line = getLine(totalXp, streak, totalShells);
+  const line = getLine(totalXp, streak, focus, totalShells);
 
   return (
     <TouchableOpacity
@@ -38,9 +41,7 @@ const CrabCoach: React.FC<CrabCoachProps> = ({
         <Text style={styles.role}>coach on call</Text>
         <Text style={styles.message}>{line}</Text>
         <View style={styles.chip}>
-          <Text style={styles.chipText}>
-            Open coaching space
-          </Text>
+          <Text style={styles.chipText}>Open coaching space</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -50,6 +51,7 @@ const CrabCoach: React.FC<CrabCoachProps> = ({
 function getLine(
   totalXp: number,
   streak: number,
+  focus: Focus,
   shells: number
 ): string {
   if (streak >= 5) {
@@ -59,12 +61,18 @@ function getLine(
     return 'Start small. One real attempt is enough for today.';
   }
   if (totalXp < 60) {
-    return 'You have momentum. Let’s place it on one real situation, not just in your head.';
+    return 'You’ve started. Let’s anchor it to one situation you actually care about.';
   }
   if (shells >= 15 && totalXp > 120) {
-    return 'These reps are proof. You are not starting from zero anymore.';
+    return 'These reps are proof you’re already changing, not starting from scratch.';
   }
-  return 'Pick one moment today to be a little clearer, kinder, or calmer than usual.';
+  if (focus === 'stress') {
+    return 'Pick one predictable spike and decide how you want to meet it.';
+  }
+  if (focus === 'performance') {
+    return 'Protect a small block of focus time for what actually matters to you.';
+  }
+  return 'Choose one interaction today to handle with more honesty and care.';
 }
 
 const styles = StyleSheet.create({
@@ -135,4 +143,3 @@ const styles = StyleSheet.create({
 });
 
 export default CrabCoach;
-
