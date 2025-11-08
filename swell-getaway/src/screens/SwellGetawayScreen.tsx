@@ -279,7 +279,7 @@ const SwellGetawayScreen: React.FC = () => {
     setTotalShells((s) => s + 1);
   };
 
-  // ----- RENDER: HOME TAB -----
+  // ----- HOME TAB: ReefHome owns vertical swipe + hero crab -----
 
   if (tab === 'home') {
     return (
@@ -297,30 +297,29 @@ const SwellGetawayScreen: React.FC = () => {
           onOpenCoach={() => setShowCoach(true)}
         />
 
-        {/* bottom tabs overlay */}
         <View style={styles.tabsRow}>
           <TabButton
             label="Reef"
             icon="🏝️"
-            active={tab === 'home'}
+            active
             onPress={() => setTab('home')}
           />
           <TabButton
             label="Missions"
             icon="📋"
-            active={tab === 'missions'}
+            active={false}
             onPress={() => setTab('missions')}
           />
           <TabButton
             label="Profile"
             icon="👤"
-            active={tab === 'profile'}
+            active={false}
             onPress={() => setTab('profile')}
           />
           <TabButton
             label="Unlocks"
             icon="🪸"
-            active={tab === 'unlocks'}
+            active={false}
             onPress={() => setTab('unlocks')}
           />
         </View>
@@ -338,7 +337,6 @@ const SwellGetawayScreen: React.FC = () => {
           onSave={confirmReflection}
         />
 
-        {/* zoomed reef */}
         <Modal
           visible={showReefZoom}
           transparent
@@ -361,6 +359,7 @@ const SwellGetawayScreen: React.FC = () => {
               onCollectCucumber={
                 handleCollectCucumber
               }
+              compact={false}
             />
           </View>
         </Modal>
@@ -368,7 +367,7 @@ const SwellGetawayScreen: React.FC = () => {
     );
   }
 
-  // ----- RENDER: OTHER TABS -----
+  // ----- OTHER TABS: missions / profile / unlocks -----
 
   return (
     <ImageBackground
@@ -432,7 +431,10 @@ const SwellGetawayScreen: React.FC = () => {
           <Animated.View
             style={[
               styles.levelUpBanner,
-              { opacity: levelBannerOpacity },
+              {
+                opacity:
+                  levelBannerOpacity,
+              },
             ]}
           >
             <Text style={styles.levelUpText}>
@@ -455,7 +457,9 @@ const SwellGetawayScreen: React.FC = () => {
                   Focus
                 </Text>
                 <View
-                  style={styles.focusChipsRow}
+                  style={
+                    styles.focusChipsRow
+                  }
                 >
                   {(['relationships',
                     'stress',
@@ -492,7 +496,9 @@ const SwellGetawayScreen: React.FC = () => {
 
               <View style={styles.card}>
                 <Text
-                  style={styles.cardLabel}
+                  style={
+                    styles.cardLabel
+                  }
                 >
                   Today’s tiny rep
                 </Text>
@@ -536,7 +542,6 @@ const SwellGetawayScreen: React.FC = () => {
             )}
         </ScrollView>
 
-        {/* tabs */}
         <View style={styles.tabsRow}>
           <TabButton
             label="Reef"
@@ -548,19 +553,25 @@ const SwellGetawayScreen: React.FC = () => {
             label="Missions"
             icon="📋"
             active={tab === 'missions'}
-            onPress={() => setTab('missions')}
+            onPress={() =>
+              setTab('missions')
+            }
           />
           <TabButton
             label="Profile"
             icon="👤"
             active={tab === 'profile'}
-            onPress={() => setTab('profile')}
+            onPress={() =>
+              setTab('profile')
+            }
           />
           <TabButton
             label="Unlocks"
             icon="🪸"
             active={tab === 'unlocks'}
-            onPress={() => setTab('unlocks')}
+            onPress={() =>
+              setTab('unlocks')
+            }
           />
         </View>
 
@@ -603,6 +614,7 @@ const SwellGetawayScreen: React.FC = () => {
               onCollectCucumber={
                 handleCollectCucumber
               }
+              compact={false}
             />
           </View>
         </Modal>
@@ -621,7 +633,7 @@ const TabButton = ({
 }: {
   label: string;
   icon: string;
-  active: boolean;
+  active?: boolean;
   onPress: () => void;
 }) => (
   <TouchableOpacity
@@ -933,16 +945,18 @@ function renderProfile(
           You
         </Text>
         <Text style={styles.profileLine}>
-          Level {level} · {totalXp} XP total
+          Level {level} · {totalXp} XP
         </Text>
         <Text style={styles.profileLine}>
           Shells banked: {totalShells}
         </Text>
         <Text style={styles.profileLine}>
-          Current streak: {streak || 0} days
+          Current streak:{' '}
+          {streak || 0} days
         </Text>
         <Text style={styles.profileLine}>
-          Longest streak: {longest || 0} days
+          Longest streak:{' '}
+          {longest || 0} days
         </Text>
       </View>
 
@@ -952,8 +966,8 @@ function renderProfile(
         </Text>
         {entries.length === 0 ? (
           <Text style={styles.historyEmpty}>
-            Once you log missions, they’ll
-            land here.
+            Once you log a few missions,
+            they’ll land here.
           </Text>
         ) : (
           entries
@@ -963,8 +977,8 @@ function renderProfile(
                 key={e.id}
                 style={styles.historyItem}
               >
-                {e.date} · +{e.xp} XP · +
-                {e.shells} 🐚
+                {e.date} · +{e.xp}{' '}
+                XP · +{e.shells} 🐚
                 {e.reflection
                   ? ` — ${e.reflection}`
                   : ''}
@@ -977,10 +991,16 @@ function renderProfile(
 }
 
 function renderUnlocks(
-  milestones: { xp: number; label: string }[],
+  milestones: {
+    xp: number;
+    label: string;
+  }[],
   totalXp: number,
   unlocks: string[],
-  onPress: (xp: number, label: string) => void
+  onPress: (
+    xp: number,
+    label: string
+  ) => void
 ) {
   const coralPieces =
     unlocks.filter((u) =>
@@ -994,9 +1014,9 @@ function renderUnlocks(
           Reef growth
         </Text>
         <Text style={styles.cardPrompt}>
-          Each milestone adds a new piece:
-          shade, dock, palms, lighthouse,
-          and deeper reef.
+          Each milestone adds new
+          pieces to your shore and
+          reef.
         </Text>
         <View style={styles.coralRowUnlock}>
           {Array.from({ length: 5 }).map(
@@ -1018,7 +1038,8 @@ function renderUnlocks(
         Milestones
       </Text>
       {milestones.map((m) => {
-        const done = totalXp >= m.xp;
+        const done =
+          totalXp >= m.xp;
         return (
           <TouchableOpacity
             key={m.xp}
@@ -1067,7 +1088,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 32,
     paddingBottom: 10,
-    backgroundColor: 'rgba(0,0,0,0.14)',
+    backgroundColor: 'rgba(0,0,0,0.18)',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -1198,7 +1219,8 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   missionDone: {
-    backgroundColor: 'rgba(211,241,220,0.98)',
+    backgroundColor:
+      'rgba(211,241,220,0.98)',
     borderColor: '#8AC79A',
     borderWidth: 1,
   },
@@ -1257,12 +1279,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.7)',
+    borderColor:
+      'rgba(255,255,255,0.7)',
     marginBottom: 4,
-    backgroundColor: 'rgba(5,24,54,0.35)',
+    backgroundColor:
+      'rgba(5,24,54,0.35)',
   },
   milestonePillDone: {
-    backgroundColor: 'rgba(5,24,54,0.96)',
+    backgroundColor:
+      'rgba(5,24,54,0.96)',
     borderColor: '#FFFFFF',
   },
   milestoneLabel: {
@@ -1286,7 +1311,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor:
+      'rgba(0,0,0,0.6)',
   },
   tabButton: {
     flex: 1,
@@ -1294,7 +1320,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   tabButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor:
+      'rgba(255,255,255,0.12)',
     borderRadius: 14,
   },
   tabIcon: {
@@ -1316,7 +1343,8 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor:
+      'rgba(0,0,0,0.35)',
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
