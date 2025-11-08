@@ -1,80 +1,70 @@
 import React from 'react';
 import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
-import { Focus } from '../state/getawayLogic';
 
 type CrabCoachProps = {
   totalXp: number;
   streak: number;
-  focus: Focus;
   totalShells: number;
+  onOpenCrab?: () => void;
 };
 
 const CrabCoach: React.FC<CrabCoachProps> = ({
   totalXp,
   streak,
-  focus,
   totalShells,
+  onOpenCrab,
 }) => {
-  const line = getLine(totalXp, streak, focus, totalShells);
-
-  const handlePress = () => {
-    const suggestion =
-      focus === 'stress'
-        ? 'Pick one moment that usually spikes your stress and decide how you want to meet it today.'
-        : focus === 'performance'
-        ? 'Choose one task that actually matters and give it five more seconds of attention than you usually would.'
-        : 'Think of one person who deserves a softer version of you tonight and plan that message now.';
-    Alert.alert('Riff’s quick idea', suggestion);
-  };
+  const line = getLine(totalXp, streak, totalShells);
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity
+      style={styles.container}
+      activeOpacity={0.9}
+      onPress={onOpenCrab}
+    >
       <View style={styles.iconBubble}>
-        <Text style={styles.crabIcon}>🦀</Text>
+        <View style={styles.crabBody}>
+          <View style={styles.crabEye} />
+          <View style={styles.crabEye} />
+        </View>
       </View>
       <View style={styles.textBlock}>
         <Text style={styles.name}>Riff</Text>
-        <Text style={styles.role}>shoreline guide</Text>
+        <Text style={styles.role}>coach on call</Text>
         <Text style={styles.message}>{line}</Text>
-        <TouchableOpacity style={styles.chip} onPress={handlePress}>
-          <Text style={styles.chipText}>Give me one small move</Text>
-        </TouchableOpacity>
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>
+            Open coaching space
+          </Text>
+        </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
 function getLine(
   totalXp: number,
   streak: number,
-  focus: Focus,
   shells: number
 ): string {
   if (streak >= 5) {
-    return `You keep showing up. Let’s use that for one conversation or moment that actually counts today.`;
+    return 'You keep showing up. Choose one moment today that deserves that same care.';
   }
   if (totalXp === 0) {
-    return 'Start with one honest rep. I will remember it, even if no one else sees it.';
+    return 'Start small. One real attempt is enough for today.';
   }
   if (totalXp < 60) {
-    return 'You have started. Choose one mission that feels doable and lock in one real moment.';
+    return 'You have momentum. Let’s place it on one real situation, not just in your head.';
   }
   if (shells >= 15 && totalXp > 120) {
-    return 'These shells are proof you are practicing, not just thinking about it. Let’s keep it grounded.';
+    return 'These reps are proof. You are not starting from zero anymore.';
   }
-  if (focus === 'stress') {
-    return 'You are learning to stay steady when it is loud. Pick one spike to practice on today.';
-  }
-  if (focus === 'performance') {
-    return 'Your effort is real. Aim it at one thing that moves your week, not just your inbox.';
-  }
-  return 'You care about your people. Choose one interaction to handle with a little more honesty and care.';
+  return 'Pick one moment today to be a little clearer, kinder, or calmer than usual.';
 }
 
 const styles = StyleSheet.create({
@@ -88,16 +78,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#264B7A',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#203956',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
-  crabIcon: {
-    fontSize: 22,
+  crabBody: {
+    width: 22,
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: '#E5754A',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+  },
+  crabEye: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#F5F5F5',
   },
   textBlock: {
     flex: 1,
@@ -132,3 +135,4 @@ const styles = StyleSheet.create({
 });
 
 export default CrabCoach;
+

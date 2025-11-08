@@ -21,60 +21,79 @@ export function getTodayId(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function generateDailyPrompt(focus: Focus, seed: string) {
-  const prompts: Record<Focus, string[]> = {
-    relationships: [
-      'Defuse one tense moment by pausing 3 seconds before you answer.',
-      'Give one clear, kind boundary instead of swallowing it.',
-      'Turn one defensive reply into a curiosity question.',
-    ],
-    stress: [
-      'Pick one high-pressure moment and plan a 10-second reset you’ll actually use.',
-      'Name your top stressor and one thing still under your control.',
-      'Protect one 5-minute window just for breathing and posture check.',
-    ],
-    performance: [
-      'Before one key task, define success in a single clear sentence.',
-      'Clarify one expectation with a teammate instead of assuming.',
-      'Slow one important decision down by 5 seconds before you commit.',
-    ],
-  };
+/**
+ * Unified daily prompt.
+ * We keep the (focus, seed) signature for compatibility,
+ * but focus is not used: the prompt represents your full shoreline.
+ */
+export function generateDailyPrompt(_focus: Focus, seed: string) {
+  const prompts: string[] = [
+    'Pick one real moment today and try a softer, clearer version of yourself.',
+    'Choose one stress spike you expect and decide how you want to handle it.',
+    'Give one person a reply you will be proud of later.',
+    'Protect one block of focus for work that actually matters to you.',
+    'Name one thing that is in your control and act on it.',
+    'Turn one defensive instinct into a curious question.',
+  ];
 
-  const list = prompts[focus] || prompts.relationships;
-  const index = simpleHash(seed + focus) % list.length;
-  return { text: list[index] };
+  const index = simpleHash(seed + 'unified') % prompts.length;
+  return { text: prompts[index] };
 }
 
-export function getDailyMissions(focus: Focus, date: string): DailyMission[] {
-  const base = simpleHash(date + focus).toString();
+/**
+ * getDailyMissions:
+ * Instead of separate modes, each day returns a small mixed stack:
+ * - one relationships rep
+ * - one stress/regulation rep
+ * - one performance rep
+ * Deterministic based on date so it feels stable for the day.
+ */
+export function getDailyMissions(_focus: Focus, date: string): DailyMission[] {
+  const base = simpleHash(date);
 
-  return [
-    {
-      id: base + '-1',
-      label: 'Use today’s tiny rep once in a real situation.',
-      xp: 15,
-      tier: 'core',
-      rewardShells: 2,
-      requiresReflection: false,
-    },
-    {
-      id: base + '-2',
-      label: 'Log a 1-line reflection about that moment.',
-      xp: 10,
-      tier: 'easy',
-      rewardShells: 1,
-      requiresReflection: true,
-    },
-    {
-      id: base + '-3',
-      label:
-        'Apply a Swell skill in a harder-than-average moment (tension, stakes, or urgency).',
-      xp: 25,
-      tier: 'stretch',
-      rewardShells: 4,
-      requiresReflection: true,
-    },
+  const relMissions = [
+    'Send one honest check-in to someone who matters.',
+    'In one hard moment, listen fully before you answer.',
+    'Thank someone directly for something you usually overlook.',
   ];
+
+  const stressMissions = [
+    'Take 3 slow breaths before a moment that usually spikes you.',
+    'Step away from your screen for 60 seconds when you feel flooded.',
+    'Name the top stressor out loud and choose one next step.',
+  ];
+
+  const perfMissions = [
+    'Give your most important task five extra minutes of clean focus.',
+    'Clarify success for one task in a single sentence before you start.',
+    'Ask one direct question that removes uncertainty at work.',
+  ];
+
+  const pick = (
+    list: string[],
+    offset: number,
+    tier: 'easy' | 'core' | 'stretch',
+    xp: number,
+    shells: number,
+    requiresReflection: boolean
+  ): DailyMission => {
+    const idx = (base + offset) % list.length;
+    const raw = list[idx];
+    return {
+      id: `${date}-${tier}-${offset}`,
+      label: raw,
+      xp,
+      tier,
+      rewardShells: shells,
+      requiresReflection,
+    };
+  };
+
+  const rel = pick(relMissions, 1, 'core', 18, 2, true);
+  const stress = pick(stressMissions, 7, 'easy', 10, 1, false);
+  const perf = pick(perfMissions, 13, 'stretch', 24, 3, true);
+
+  return [rel, stress, perf];
 }
 
 export function getLevelMeta(totalXp: number): LevelMeta {
@@ -88,7 +107,10 @@ export function getLevelMeta(totalXp: number): LevelMeta {
   const currentBase = thresholds[level] ?? 0;
   const nextBase = thresholds[level + 1] ?? currentBase + 200;
   const span = nextBase - currentBase || 1;
-  const progress = Math.max(0, Math.min(1, (totalXp - currentBase) / span));
+  const progress = Math.max(
+    0,
+    Math.min(1, (totalXp - currentBase) / span)
+  );
 
   const label =
     level === 0
@@ -112,7 +134,10 @@ export function getLevelMeta(totalXp: number): LevelMeta {
   };
 }
 
-export function getUnlocks(totalXp: number, totalShells: number): string[] {
+export function getUnlocks(
+  totalXp: number,
+  totalShells: number
+): string[] {
   const unlocks: string[] = ['shore'];
 
   if (totalXp >= 20) unlocks.push('towel');
@@ -137,10 +162,7 @@ function simpleHash(str: string): number {
 }
 
 /**
- * Default export added so ANY old imports like:
- *   import getawayLogic from '../state/getawayLogic';
- *   getawayLogic.getDailyMissions(...)
- * still work.
+ * Default export so any legacy imports still work.
  */
 const getawayLogic = {
   getTodayId,
@@ -151,3 +173,4 @@ const getawayLogic = {
 };
 
 export default getawayLogic;
+
