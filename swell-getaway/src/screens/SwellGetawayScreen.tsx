@@ -33,6 +33,48 @@ import ReefHome from './ReefHome';
 const beachBg = require('../../assets/getaway/beach-bg.jpg');
 const crabImg = require('../../assets/getaway/crab.png');
 
+// If you're on a real device, replace localhost with your computer's IP.
+// Example: 'http://192.168.1.50:4000'
+const API_BASE = 'http://10.2.64.5:4000';
+
+async function getAiScoreForMission(
+  mission: DailyMission,
+  reflection: string,
+  currentXp: number,
+  streak: number
+): Promise<{ xp: number; note?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/score-mission`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        missionText: mission.label,
+        reflection,
+        currentXp,
+        streak,
+        tier: mission.tier,
+      }),
+    });
+
+    if (!res.ok) throw new Error('Bad response from scorer');
+    const data = await res.json();
+
+    const xp =
+      typeof data.xp === 'number'
+        ? Math.max(10, Math.min(60, data.xp)) // clamp 10–60
+        : 20;
+
+    return { xp, note: data.note };
+  } catch (e) {
+    // Fallback if AI is down or network fails
+        const fallback = 10;
+        return { xp: fallback };
+
+  }
+}
+
+
+
 type Entry = {
   id: string;
   date: string;
@@ -155,102 +197,119 @@ const SwellGetawayScreen: React.FC = () => {
 
   // ----- mission handlers -----
 
-  const startMission = (mission: DailyMission) => {
-    if (completedMissionIds.has(mission.id)) return;
+const startMission = async (mission: DailyMission) => {
+  if (completedMissionIds.has(mission.id)) return;
 
-    if (mission.requiresReflection) {
-      setReflectionMission(mission);
-      setReflectionText('');
-      setShowReflection(true);
-      return;
-    }
-
-    applyMissionReward(mission, '');
-  };
-
-  const applyMissionReward = (
-    mission: DailyMission,
-    note: string
-  ) => {
-    if (completedMissionIds.has(mission.id)) return;
-
-    const entry: Entry = {
-      id: `${todayId}-${mission.id}`,
-      date: todayId,
-      focus,
-      missionId: mission.id,
-      xp: mission.xp,
-      shells: mission.rewardShells,
-      reflection: note || undefined,
-    };
-
-    setEntries((prev) => [entry, ...prev]);
-    setTotalXp((prev) => prev + mission.xp);
-    setTotalShells(
-      (prev) => prev + mission.rewardShells
-    );
-  };
-
-  const confirmReflection = () => {
-    if (!reflectionMission) return;
-    applyMissionReward(
-      reflectionMission,
-      reflectionText.trim()
-    );
-    setShowReflection(false);
-    setReflectionMission(null);
+  if (mission.requiresReflection) {
+    setReflectionMission(mission);
     setReflectionText('');
-  };
+    setShowReflection(true);
+    return;
+  }
 
-  const cancelReflection = () => {
-    setShowReflection(false);
-    setReflectionMission(null);
-    setReflectionText('');
-  };
+  await applyMissionReward(mission, '');
+};
 
-  const renderMission = (mission: DailyMission) => {
-    const done =
-      completedMissionIds.has(mission.id);
-    const tierLabel =
-      mission.tier === 'easy'
-        ? 'Low friction'
-        : mission.tier === 'core'
-        ? 'Core'
-        : 'Stretch';
+const applyMissionReward = async (
+  mission: DailyMission,
+  note: string
+) => {
+  if (completedMissionIds.has(mission.id)) return;
 
-    return (
-      <TouchableOpacity
-        key={mission.id}
-        style={[
-          styles.missionCard,
-          done && styles.missionDone,
-        ]}
-        onPress={() => startMission(mission)}
-        activeOpacity={0.92}
-      >
-        <View style={styles.missionLeft}>
-          <Text style={styles.missionTier}>
-            {tierLabel}
-          </Text>
-          <Text
-            style={styles.missionLabel}
-            numberOfLines={2}
-          >
-            {mission.label}
-          </Text>
-          <Text style={styles.missionXp}>
-            +{mission.xp} XP · +
-            {mission.rewardShells} shells
-          </Text>
-        </View>
-        <View style={styles.missionStatusBubble}>
-          <Text style={styles.missionStatusText}>
-            {done ? 'Logged' : 'Tap to log'}
-          </Text>
-        </View>
-      </TouchableOpacity>
+  // 1. Ask AI/backend for XP
+  const { xp, note: aiNote } =
+    await getAiScoreForMission(
+      mission,
+      note,
+      totalXp,
+      streak
     );
+
+  // 2. Derive shells from XP (tunable)
+  const shells =
+    xp >= 50
+      ? 4
+      : xp >= 35
+      ? 3
+      : xp >= 20
+      ? 2
+      : 1;
+
+  // 3. Save entry
+  const entry: Entry = {
+    id: `${todayId}-${mission.id}`,
+    date: todayId,
+    missionId: mission.id,
+    xp,
+    shells,
+    reflection: note || aiNote || undefined,
   };
+
+  setEntries(prev => [entry, ...prev]);
+  setTotalXp(prev => prev + xp);
+  setTotalShells(prev => prev + shells);
+};
+const confirmReflection = async () => {
+  if (!reflectionMission) return;
+  const trimmed = reflectionText.trim();
+  await applyMissionReward(reflectionMission, trimmed);
+  setShowReflection(false);
+  setReflectionMission(null);
+  setReflectionText('');
+};
+
+const cancelReflection = () => {
+  setShowReflection(false);
+  setReflectionMission(null);
+  setReflectionText('');
+};
+
+const renderMission = (mission: DailyMission) => {
+  const done = completedMissionIds.has(mission.id);
+  const tierLabel =
+    mission.tier === 'easy'
+      ? 'Low friction'
+      : mission.tier === 'core'
+      ? 'Core'
+      : 'Stretch';
+
+  const loggedEntry = entries.find(
+    (e) => e.date === todayId && e.missionId === mission.id
+  );
+
+  return (
+    <TouchableOpacity
+      key={mission.id}
+      style={[
+        styles.missionCard,
+        done && styles.missionDone,
+      ]}
+      onPress={() => startMission(mission)}
+      activeOpacity={0.92}
+    >
+      <View style={styles.missionLeft}>
+        <Text style={styles.missionTier}>{tierLabel}</Text>
+        <Text
+          style={styles.missionLabel}
+          numberOfLines={2}
+        >
+          {mission.label}
+        </Text>
+        <Text style={styles.missionXp}>
+          {loggedEntry
+            ? `+${loggedEntry.xp} XP · +${loggedEntry.shells} shells`
+            : 'AI-scored XP · effort-based shells'}
+        </Text>
+      </View>
+      <View style={styles.missionStatusBubble}>
+        <Text style={styles.missionStatusText}>
+          {done ? 'Logged' : 'Tap to log'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 
   const missionsCompletedCount = missions.filter(
     (m) => completedMissionIds.has(m.id)
